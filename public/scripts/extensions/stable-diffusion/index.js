@@ -11,7 +11,7 @@ import {
     appendImageToMessage
 } from "../../../script.js";
 import { getApiUrl, getContext, extension_settings, doExtrasFetch, modules } from "../../extensions.js";
-import { stringFormat, initScrollHeight, resetScrollHeight } from "../../utils.js";
+import { stringFormat, initScrollHeight, resetScrollHeight, timestampToMoment } from "../../utils.js";
 export { MODULE_NAME };
 
 // Wraps a string into monospace font-face span
@@ -131,6 +131,9 @@ const defaultSettings = {
     horde: false,
     horde_nsfw: false,
     horde_karras: true,
+
+    // Refine mode
+    refine_mode: false,
 }
 
 async function loadSettings() {
@@ -149,8 +152,14 @@ async function loadSettings() {
     $('#sd_horde_karras').prop('checked', extension_settings.sd.horde_karras);
     $('#sd_restore_faces').prop('checked', extension_settings.sd.restore_faces);
     $('#sd_enable_hr').prop('checked', extension_settings.sd.enable_hr);
+    $('#sd_refine_mode').prop('checked', extension_settings.sd.refine_mode);
 
     await Promise.all([loadSamplers(), loadModels()]);
+}
+
+function onRefineModeInput() {
+    extension_settings.sd.refine_mode = !!$('#sd_refine_mode').prop('checked');
+    saveSettingsDebounced();
 }
 
 function onScaleInput() {
@@ -459,7 +468,7 @@ async function getPrompt(generationType, message, trigger, quiet_prompt) {
             prompt = message || getRawLastMessage();
             break;
         case generationMode.FREE:
-            prompt = processReply(trigger);
+            prompt = trigger.trim();
             break;
         default:
             prompt = await generatePrompt(quiet_prompt);
@@ -470,7 +479,7 @@ async function getPrompt(generationType, message, trigger, quiet_prompt) {
 }
 
 async function generatePrompt(quiet_prompt) {
-    return processReply(await new Promise(
+    let reply = processReply(await new Promise(
         async function promptPromise(resolve, reject) {
             try {
                 await getContext().generate('quiet', { resolve, reject, quiet_prompt, force_name2: true, });
@@ -479,6 +488,18 @@ async function generatePrompt(quiet_prompt) {
                 reject();
             }
         }));
+
+    if (extension_settings.sd.refine_mode) {
+        const refinedPrompt = await callPopup('<h3>Review and edit the generated prompt:</h3>Press "Cancel" to abort the image generation.', 'input', reply, { rows: 5 });
+
+        if (refinedPrompt) {
+            reply = refinedPrompt;
+        } else {
+            throw new Error('Generation aborted by user.');
+        }
+    }
+
+    return reply;
 }
 
 async function sendGenerationRequest(prompt, callback) {
@@ -557,7 +578,7 @@ async function sendMessage(prompt, image) {
         is_system: context.groupId ? true : false,
         is_user: false,
         is_name: true,
-        send_date: Date.now(),
+        send_date: timestampToMoment(Date.now()).format('LL LT'),
         mes: context.groupId ? p(messageText) : messageText,
         extra: {
             image: image,
@@ -583,8 +604,8 @@ function addSDGenButtons() {
     `
     const dropdownHtml = `
     <div id="sd_dropdown">
-    <span>Send me a picture of:</span>
         <ul class="list-group">
+        <span>Send me a picture of:</span>
             <li class="list-group-item" id="sd_you" data-value="you">Yourself</li>
             <li class="list-group-item" id="sd_face" data-value="face">Your Face</li>
             <li class="list-group-item" id="sd_me" data-value="me">Me</li>
@@ -608,7 +629,7 @@ function addSDGenButtons() {
     messageButton.hide();
 
     let popper = Popper.createPopper(button.get(0), dropdown.get(0), {
-        placement: 'bottom',
+        placement: 'top',
     });
 
     $(document).on('click', '.sd_message_gen', sdMessageButton);
@@ -619,10 +640,10 @@ function addSDGenButtons() {
         if (target.is(button) && !dropdown.is(":visible") && $("#send_but").css('display') === 'flex') {
             e.preventDefault();
 
-            dropdown.show(200);
+            dropdown.fadeIn(250);
             popper.update();
         } else {
-            dropdown.hide(200);
+            dropdown.fadeOut(250);
         }
     });
 }
@@ -749,6 +770,10 @@ jQuery(async () => {
             <small><i>Use slash commands or the bottom Paintbrush button to generate images. Type <span class="monospace">/help</span> in chat for more details</i></small>
             <br>
             <small><i>Hint: Save an API key in Horde KoboldAI API settings to use it here.</i></small>
+            <label for="sd_refine_mode" class="checkbox_label" title="Allow to edit prompts manually before sending them to generation API">
+                <input id="sd_refine_mode" type="checkbox" />
+                Edit prompts before generation
+            </label>
             <div class="flex-container flexGap5 marginTop10 margin-bot-10px">
                 <label class="checkbox_label">
                     <input id="sd_horde" type="checkbox" />
@@ -809,6 +834,7 @@ jQuery(async () => {
     $('#sd_horde_karras').on('input', onHordeKarrasInput);
     $('#sd_restore_faces').on('input', onRestoreFacesInput);
     $('#sd_enable_hr').on('input', onHighResFixInput);
+    $('#sd_refine_mode').on('input', onRefineModeInput);
 
     $('.sd_settings .inline-drawer-toggle').on('click', function () {
         initScrollHeight($("#sd_prompt_prefix"));

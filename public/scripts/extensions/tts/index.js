@@ -1,11 +1,13 @@
 import { callPopup, cancelTtsPlay, eventSource, event_types, isMultigenEnabled, is_send_press, saveSettingsDebounced } from '../../../script.js'
 import { ModuleWorkerWrapper, extension_settings, getContext } from '../../extensions.js'
-import { getStringHash } from '../../utils.js'
+import { escapeRegex, getStringHash } from '../../utils.js'
 import { EdgeTtsProvider } from './edge.js'
 import { ElevenLabsTtsProvider } from './elevenlabs.js'
 import { SileroTtsProvider } from './silerotts.js'
 import { SystemTtsProvider } from './system.js'
 import { NovelTtsProvider } from './novel.js'
+import { isMobile } from '../../RossAscends-mods.js'
+import { power_user } from '../../power-user.js'
 
 const UPDATE_INTERVAL = 1000
 
@@ -55,7 +57,7 @@ export function getPreviewString(lang) {
     }
     const fallbackPreview = 'Neque porro quisquam est qui dolorem ipsum quia dolor sit amet'
 
-    return  previewStrings[lang] ?? fallbackPreview;
+    return previewStrings[lang] ?? fallbackPreview;
 }
 
 let ttsProviders = {
@@ -69,6 +71,7 @@ let ttsProvider
 let ttsProviderName
 
 async function onNarrateOneMessage() {
+    audioElement.src = '/sounds/silence.mp3';
     const context = getContext();
     const id = $(this).closest('.mes').attr('mesid');
     const message = context.chat[id];
@@ -217,6 +220,7 @@ window.debugTtsPlayback = debugTtsPlayback
 //##################//
 
 let audioElement = new Audio()
+audioElement.autoplay = true
 
 let audioJobQueue = []
 let currentAudioJob
@@ -295,6 +299,7 @@ function updateUiAudioPlayState() {
 }
 
 function onAudioControlClicked() {
+    audioElement.src = '/sounds/silence.mp3';
     let context = getContext()
     // Not pausing, doing a full stop to anything TTS is doing. Better UX as pause is not as useful
     if (!audioElement.paused || isTtsProcessing()) {
@@ -404,6 +409,12 @@ async function processTtsQueue() {
     }
     console.log(`TTS: ${text}`)
     const char = currentTtsJob.name
+
+    // Remove character name from start of the line if power user setting is disabled
+    if (char && !power_user.allow_name2_display) {
+        const escapedChar = escapeRegex(char);
+        text = text.replace(new RegExp(`^${escapedChar}:`, 'gm'), '');
+    }
 
     try {
         if (!text) {
@@ -634,23 +645,23 @@ $(document).ready(function () {
                     <div>
                         <label class="checkbox_label" for="tts_enabled">
                             <input type="checkbox" id="tts_enabled" name="tts_enabled">
-                            Enabled
+                            <small>Enabled</small>
                         </label>
                         <label class="checkbox_label" for="tts_auto_generation">
                             <input type="checkbox" id="tts_auto_generation">
-                            Auto Generation
-                        </label>
-                        <label class="checkbox_label" for="tts_narrate_dialogues">
-                            <input type="checkbox" id="tts_narrate_dialogues">
-                            Narrate dialogues only
+                            <small>Auto Generation</small>
                         </label>
                         <label class="checkbox_label" for="tts_narrate_quoted">
                             <input type="checkbox" id="tts_narrate_quoted">
-                            Narrate quoted only
+                            <small>Only narrate "quotes"</small>
+                        </label>
+                        <label class="checkbox_label" for="tts_narrate_dialogues">
+                            <input type="checkbox" id="tts_narrate_dialogues">
+                            <small>Ignore *text, even "quotes", inside asterisks*</small>
                         </label>
                         <label class="checkbox_label" for="tts_narrate_translated_only">
                             <input type="checkbox" id="tts_narrate_translated_only">
-                            Narrate only the translated text
+                            <small>Narrate only the translated text</small>
                         </label>
                     </div>
                     <label>Voice Map</label>

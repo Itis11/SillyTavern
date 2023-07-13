@@ -120,7 +120,7 @@ $(document).ready(function () {
         <div class="background_settings">
             <div class="inline-drawer">
                 <div class="inline-drawer-toggle inline-drawer-header">
-                    <b>Character Backgrounds</b>
+                    <b>Chat Backgrounds</b>
                     <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
                 </div>
                 <div class="inline-drawer-content">
@@ -164,7 +164,7 @@ $(document).ready(function () {
 
     addSettings();
     setInterval(moduleWorker, UPDATE_INTERVAL);
-    registerSlashCommand('lock', onLockBackgroundClick, [], " – locks a background for the currently selected chat", true, true);
-    registerSlashCommand('unlock', onUnlockBackgroundClick, [], ' – unlocks a background for the currently selected chat', true, true);
-    registerSlashCommand('autobg', autoBackgroundCommand, ['bgauto'], ' – automatically changes the background based on the chat context', true, true);
+    registerSlashCommand('lockbg', onLockBackgroundClick, ['bglock'], " – locks a background for the currently selected chat", true, true);
+    registerSlashCommand('unlockbg', onUnlockBackgroundClick, ['bgunlock'], ' – unlocks a background for the currently selected chat', true, true);
+    registerSlashCommand('autobg', autoBackgroundCommand, ['bgauto'], ' – automatically changes the background based on the chat context using the AI request prompt', true, true);
 });
